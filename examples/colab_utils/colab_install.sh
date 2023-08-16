@@ -1,9 +1,4 @@
 #!/bin/bash
-
-# Copyright (c) Meta Platforms, Inc. and its affiliates.
-# This source code is licensed under the MIT license found in the
-# LICENSE file in the root directory of this source tree.
-
 set -e
 shopt -s extglob
 shopt -s globstar
@@ -24,7 +19,7 @@ PIL_VERSION="$(python -c 'import PIL; print(PIL.__version__)')"
 CFFI_VERSION="$(python -c 'import cffi; print(cffi.__version__)')"
 NUMPY_VERSION="$(python -c 'import numpy as np; print(np.__version__)')"
 SCIPY_VERSION="$(python -c 'import scipy; print(scipy.__version__)')"
-NUMBA_VERSION="$(python -c 'import numba; print(numba.__version__)')"
+HABITAT_VERSION="0.2.1"
 #Install Miniconda
 cd /content/
 wget -c https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh && bash Miniconda3-latest-Linux-x86_64.sh -bfp /usr/local
@@ -39,7 +34,7 @@ CHANNEL="${CHANNEL:-aihabitat}"
 if ${NIGHTLY}; then
   CHANNEL="${CHANNEL}-nightly"
 fi
-conda install -S -y --prefix /usr/local -c "${CHANNEL}" -c conda-forge habitat-sim headless withbullet "python=${PYTHON_VERSION}" "numpy=${NUMPY_VERSION}" "pillow=${PIL_VERSION}" "cffi=${CFFI_VERSION}" "scipy=${SCIPY_VERSION}" "numba=${NUMBA_VERSION}"
+conda install -S -y --prefix /usr/local -c "${CHANNEL}" -c conda-forge habitat-sim=${HABITAT_VERSION} headless withbullet "python=${PYTHON_VERSION}" "numpy==${NUMPY_VERSION}" "pillow==${PIL_VERSION}" "cffi==${CFFI_VERSION}" "scipy=${SCIPY_VERSION}"
 
 #Shallow GIT clone for speed
 git clone https://github.com/facebookresearch/habitat-lab --depth 1
@@ -47,16 +42,21 @@ git clone https://github.com/facebookresearch/habitat-sim --depth 1
 
 #Install Requirements.
 cd /content/habitat-lab/
+git checkout bc85d09
 set +e
-pip install -r ./habitat-lab/requirements.txt
-reqs=(./habitat-baselines/habitat_baselines/**/requirements.txt)
+pip install -r ./requirements.txt
+reqs=(./habitat_baselines/**/requirements.txt)
 pip install "${reqs[@]/#/-r}"
 set -e
-pip install -e habitat-lab
+python setup.py develop --all
+pip install . #Reinstall to trigger sys.path update
 cd /content/habitat-sim/
+git checkout fc7fb11
 
 #Download Assets
-python src_python/habitat_sim/utils/datasets_download.py --uids ci_test_assets --replace --data-path data/
+python habitat_sim/utils/datasets_download.py --uids ci_test_assets --replace --data-path data/
+
+rm -rf habitat_sim/ # Deletes the habitat_sim folder so it doesn't interfere with import path
 
 #symlink assets appear in habitat-api folder
 ln -s /content/habitat-sim/data /content/habitat-lab/.
